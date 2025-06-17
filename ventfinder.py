@@ -10,6 +10,55 @@ import pandas as pd
 import rasterio as rio
 import numpy as np
 import csv
+import fiona
+import os 
+
+def create_shapefiles(mirova_csv, path_to_results, project_name, epsg_code, thermal_lon, thermal_lat, rctr_p):
+    # make shapefile from MIROVA .csv
+    df = pd.read_csv(mirova_csv, header=0, sep=',')
+    ctr = (df['L_MIR'] + df['L_TIR']).to_numpy()
+    rctr = ctr/np.amax(ctr)
+    df['CTR'] = ctr
+    df['Relative CTR'] = rctr
+    columns = list(df.columns)
+    crs = f'epsg:{epsg_code}'
+    dtypes = []
+    # the following loop is done so a datatype list can be constructed, even if the MIROVA team adds or subtracts columns from the .csv file 
+    for i in df.dtypes:
+        if i == 'object':
+            dtypes.append('str')
+        elif i == 'int64':
+            dtypes.append('int')
+        elif i == 'float64':
+            dtypes.append('float')
+        else:
+            raise Exception(f'Datatype {i} not currently available. Current pandas datatypes handled are: object, float64, and int64.')
+    schema = {'geometry': 'Polygon', 'properties': list(zip(columns, dtypes))}
+    alerted_pixels_directory = f'{path_to_results}alerted_pixels_{project_name}'
+    os.mkdir(alerted_pixels_directory)
+    alerted_pixels_shapefile = alerted_pixels_directory + f'/alerted_pixels_{project_name}.shp'
+    polyShp_alerted = fiona.open(alerted_pixels_shapefile, mode='w', driver='ESRI Shapefile', schema=schema, crs=crs)
+    for i in range(df.shape[0]):
+        x = df.LON[i]
+        y = df.LAT[i]
+        left_x = x - 375/2
+        top_y = y + 375/2
+        right_x = x + 375/2
+        bottom_y = y - 375/2
+        coords = [[(left_x, top_y), (right_x, top_y),
+                         (right_x, top_y), (right_x, bottom_y),
+                         (right_x, bottom_y), (left_x, bottom_y),
+                         (left_x, bottom_y), (left_x, top_y)]]
+        properties = dict(list(zip(columns, df.values[i])))
+        geo_dict = {'geometry': {'type': 'Polygon', 
+                    'coordinates': coords},
+                    'properties': properties}
+    
+        polyShp_alerted.write(geo_dict)
+    
+    polyShp_alerted.close()
+    
+    # make shapefile for thermally thresholded pixels
 
 
 def separate_clusters(index_tuples):
@@ -345,11 +394,25 @@ def run_ventfinder(mirova_csv, dem, path_to_results, project_name, threshold=0.5
     dem.close()
     
     groups, x_mesh, y_mesh, grid_rad_relative = cluster_id_and_relative_radiance(lat, lon, resolution, combo, threshold=threshold)
+    thermal_latitudes = []
+    thermal_longitudes = []
+    rads_prime = []
+    for cluster in groups:
+        for coords in cluster:
+            thermal_latitude = y_mesh[coords[0], coords[1]]
+            thermal_latitudes.append(thermal_latitude)
+            thermal_longitude = x_mesh[coords[0], coords[1]]
+            thermal_longitudes.append(thermal_longitude)
+            rctr_p = grid_rad_relative[coords[0], coords[1]]
+            rads_prime.append(rctr_p)
+            thermal_longitudes.append(thermal_longitude)
+
+    
     coords = highest_in_cluster(elevations, dem_lat, dem_lon, 
                                         groups, x_mesh, y_mesh, resolution, grid_rad_relative)
     
     fields = ['LAT', 'LON', 'Elevation']
-    outfile = path_to_results + project_name + '_mirovapixels.csv'
+    outfile = path_to_results + project_name + '_selected_pixels.csv'
     with open(outfile, 'w') as csvfile:
         csvwriter = csv.writer(csvfile)
         csvwriter.writerow(fields)
