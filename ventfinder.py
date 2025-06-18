@@ -13,7 +13,7 @@ import csv
 import fiona
 import os 
 
-def create_shapefiles(mirova_csv, path_to_results, project_name, epsg_code, thermal_lon, thermal_lat, rctr_p):
+def create_shapefiles(mirova_csv, path_to_results, project_name, epsg_code, thermal_longitudes, thermal_latitudes, rctr_p, xyz_coords):
     # make shapefile from MIROVA .csv
     df = pd.read_csv(mirova_csv, header=0, sep=',')
     ctr = (df['L_MIR'] + df['L_TIR']).to_numpy()
@@ -59,6 +59,85 @@ def create_shapefiles(mirova_csv, path_to_results, project_name, epsg_code, ther
     polyShp_alerted.close()
     
     # make shapefile for thermally thresholded pixels
+    lat_lon = list(zip(thermal_latitudes, thermal_longitudes))
+    idx = []
+    for i, row in df.iterrows():
+        lat_lon_i = (row.LAT, row.LON)
+        if lat_lon_i in lat_lon:
+            idx.append(i)
+    
+    df_thermal = df.iloc[idx]
+    df_thermal["rCTR'"] = rctr_p
+    dtypes.append('float')
+    thermal_columns = list(df_thermal.columns)
+    schema = {'geometry': 'Polygon', 'properties': list(zip(thermal_columns, dtypes))}
+    thermal_pixels_directory = f'{path_to_results}thermal_pixels_{project_name}'
+    os.mkdir(thermal_pixels_directory)
+    thermal_pixels_shapefile = thermal_pixels_directory + f'/thermal_pixels_{project_name}.shp'
+    polyShp_thermal = fiona.open(thermal_pixels_shapefile, mode='w', driver='ESRI Shapefile', schema=schema, crs=crs)
+    for i in range(df_thermal.shape[0]):
+        x = df_thermal.LON.iloc[i]
+        y = df_thermal.LAT.iloc[i]
+        left_x = x - 375/2
+        top_y = y + 375/2
+        right_x = x + 375/2
+        bottom_y = y - 375/2
+        coords = [[(left_x, top_y), (right_x, top_y),
+                         (right_x, top_y), (right_x, bottom_y),
+                         (right_x, bottom_y), (left_x, bottom_y),
+                         (left_x, bottom_y), (left_x, top_y)]]
+        properties = dict(list(zip(thermal_columns, df_thermal.values[i])))
+        geo_dict = {'geometry': {'type': 'Polygon', 
+                    'coordinates': coords},
+                    'properties': properties}
+    
+        polyShp_thermal.write(geo_dict)
+    
+    polyShp_thermal.close()
+    
+    # make shapefile for final selected pixels
+    elevs = []
+    _lats_ = []
+    _lons_ = []
+    for arr in xyz_coords:
+        _lats_.append(arr[0])
+        _lons_.append(arr[1])
+        elevs.append(arr[2])
+    lat_lon = list(zip(_lats_, _lons_))
+    idx = []
+    for i, row in df_thermal.iterrows():
+        lat_lon_i = (row.LAT, row.LON)
+        if lat_lon_i in lat_lon:
+            idx.append(i)
+    
+    df_final = df_thermal.iloc[idx]
+    df_final['Average Elevation'] = elevs
+    dtypes.append('float')
+    final_columns = list(df_final.columns)
+    schema = {'geometry': 'Polygon', 'properties': list(zip(final_columns, dtypes))}
+    final_pixels_directory = f'{path_to_results}final_selected_pixels_{project_name}'
+    os.mkdir(final_pixels_directory)
+    final_pixels_shapefile = final_pixels_directory + f'/final_selected_pixels_{project_name}.shp'
+    polyShp_final = fiona.open(final_pixels_shapefile, mode='w', driver='ESRI Shapefile', schema=schema, crs=crs)
+    for i in range(df_final.shape[0]):
+        x = df_final.LON.iloc[i]
+        y = df_final.LAT.iloc[i]
+        left_x = x - 375/2
+        top_y = y + 375/2
+        right_x = x + 375/2
+        bottom_y = y - 375/2
+        coords = [[(left_x, top_y), (right_x, top_y),
+                         (right_x, top_y), (right_x, bottom_y),
+                         (right_x, bottom_y), (left_x, bottom_y),
+                         (left_x, bottom_y), (left_x, top_y)]]
+        properties = dict(list(zip(final_columns, df_final.values[i])))
+        geo_dict = {'geometry': {'type': 'Polygon', 
+                    'coordinates': coords},
+                    'properties': properties}
+    
+        polyShp_final.write(geo_dict)
+    
+    polyShp_final.close()
 
 
 def separate_clusters(index_tuples):
@@ -344,7 +423,7 @@ def mask_bounds(mask_layer):
     
     return min_x, min_y, max_x, max_y
             
-def run_ventfinder(mirova_csv, dem, path_to_results, project_name, threshold=0.5, mask=None):
+def run_ventfinder(mirova_csv, dem, path_to_results, project_name, threshold=0.5, mask=None, shapefiles=False):
     """
     Reads the input files, calls cluster_id_and_normalization and highest_in_cluster,
     and writes a .csv file with the latitude and longitude coordinates and 
@@ -397,6 +476,7 @@ def run_ventfinder(mirova_csv, dem, path_to_results, project_name, threshold=0.5
     thermal_latitudes = []
     thermal_longitudes = []
     rads_prime = []
+
     for cluster in groups:
         for coords in cluster:
             thermal_latitude = y_mesh[coords[0], coords[1]]
@@ -405,10 +485,10 @@ def run_ventfinder(mirova_csv, dem, path_to_results, project_name, threshold=0.5
             thermal_longitudes.append(thermal_longitude)
             rctr_p = grid_rad_relative[coords[0], coords[1]]
             rads_prime.append(rctr_p)
-            thermal_longitudes.append(thermal_longitude)
+            
 
     
-    coords = highest_in_cluster(elevations, dem_lat, dem_lon, 
+    xyz_coords = highest_in_cluster(elevations, dem_lat, dem_lon, 
                                         groups, x_mesh, y_mesh, resolution, grid_rad_relative)
     
     fields = ['LAT', 'LON', 'Elevation']
@@ -416,6 +496,15 @@ def run_ventfinder(mirova_csv, dem, path_to_results, project_name, threshold=0.5
     with open(outfile, 'w') as csvfile:
         csvwriter = csv.writer(csvfile)
         csvwriter.writerow(fields)
-        csvwriter.writerows(coords)
+        csvwriter.writerows(xyz_coords)
+        
+    if shapefiles:
+        create_shapefiles(mirova_csv, path_to_results, project_name, epsg_code, thermal_longitudes, thermal_latitudes, rctr_p, xyz_coords)
+        
+mirova_csv = '/home/jennadia/MIROVA-DOWNFLOWGO/mirova_csvs/Etna VIIRS375/Etna_020625_1200_VIIRS375.csv'
+path_to_results = '/home/jennadia/MIROVA-DOWNFLOWGO/MIROVA_DOWNFLOWGO_tests/not_used_in_thesis/ventfinder_shapefile_tests'
+project_name = 'etna_test'
+epsg_code = 32633
+dem = '/home/jennadia/pyflowgo/DOWNFLOWGO_distribute/input_files/dem_2015_4m.tiff'
         
 
