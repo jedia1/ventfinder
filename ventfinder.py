@@ -13,7 +13,44 @@ import csv
 import fiona
 import os 
 
-def create_shapefiles(mirova_csv, path_to_results, project_name, epsg_code, thermal_longitudes, thermal_latitudes, rctr_p, xyz_coords):
+def create_shapefiles(mirova_csv, path_to_results, project_name, epsg_code, thermal_longitudes, thermal_latitudes, rads_prime, xyz_coords):
+    """
+    This function creates ESRI shapefiles for: (1) alerted MIROVA pixels, (2) MIROVA pixels
+    remaining after thermal thresholding, and (3) final pixel selections. The attributes
+    the first shapefile include all data in the mirova .csv file, and rCTR values. 
+    The second sahpefile includes all attributes of the first shapefile, and the rCTR'
+    values of each pixel. The third shapefile includes all the attributes of the second
+    shapefile, and average pixel elevations.
+
+    Parameters
+    ----------
+    mirova_csv : str
+        path to .csv with alerted pixel information
+    path_to_results : string
+        path to folder where .csv output will be written
+    project_name : str
+        name to append to output files
+    epsg_code : str or int
+        EPSG code for CRS of output files (should be the same CRS as the DEM)
+    thermal_longitudes : list
+        list of longitudes of MIORVA pixels remaining after radiance thresholding
+    thermal_latitudes : list
+        list of latitudes of MIORVA pixels remaining after radiance thresholding
+    rads_prime : list
+        list of relative combined thermal radiances prime (rCTR'') of MIORVA pixels remaining after radiance thresholding
+    xyz_coords : list
+        list of lists of [latitude, longitude, elevation] of final MIROVA pixel selections
+
+    Raises
+    ------
+    Exception
+        An exception is raised if the MIROVA csv file contains data types other than str, int, or float.
+
+    Returns
+    -------
+    None.
+    """
+
     # make shapefile from MIROVA .csv
     df = pd.read_csv(mirova_csv, header=0, sep=',')
     ctr = (df['L_MIR'] + df['L_TIR']).to_numpy()
@@ -67,7 +104,7 @@ def create_shapefiles(mirova_csv, path_to_results, project_name, epsg_code, ther
             idx.append(i)
     
     df_thermal = df.iloc[idx]
-    df_thermal["rCTR'"] = rctr_p
+    df_thermal["rCTR'"] = rads_prime
     dtypes.append('float')
     thermal_columns = list(df_thermal.columns)
     schema = {'geometry': 'Polygon', 'properties': list(zip(thermal_columns, dtypes))}
@@ -423,7 +460,7 @@ def mask_bounds(mask_layer):
     
     return min_x, min_y, max_x, max_y
             
-def run_ventfinder(mirova_csv, dem, path_to_results, project_name, threshold=0.5, mask=None, shapefiles=False):
+def run_ventfinder(mirova_csv, dem, path_to_results, project_name, epsg_code, threshold=0.5, mask=None, shapefiles=False):
     """
     Reads the input files, calls cluster_id_and_normalization and highest_in_cluster,
     and writes a .csv file with the latitude and longitude coordinates and 
@@ -431,13 +468,24 @@ def run_ventfinder(mirova_csv, dem, path_to_results, project_name, threshold=0.5
 
     Parameters
     ----------
-    mirova_csv : string
+    mirova_csv : str
         Path to .csv with alerted pixel information
-    dem : string
+    dem : str
         Path to DEM
-    path_to_results : string
+    path_to_results : str
         path to folder where .csv output will be written
-
+    epsg_code : str or int
+        EPSG code for CRS of output files (should be the same CRS as the DEM)
+    threshold : float
+        default=0.5. rCTR value used for thermal thresholding. Pixels with
+        rCTR values below this value will be elimnated from consideration.
+    mask: Nonetype or str
+        default=None. If not None, this is the path to a DEM with the extent of
+        the area the user wants excludeed from analysis
+    shapefiles : bool
+        default is False. If True, shapefiles are created for results (see
+        documentation for function create_shapefiles)
+    
     Returns
     -------
     None.
@@ -501,10 +549,6 @@ def run_ventfinder(mirova_csv, dem, path_to_results, project_name, threshold=0.5
     if shapefiles:
         create_shapefiles(mirova_csv, path_to_results, project_name, epsg_code, thermal_longitudes, thermal_latitudes, rctr_p, xyz_coords)
         
-mirova_csv = '/home/jennadia/MIROVA-DOWNFLOWGO/mirova_csvs/Etna VIIRS375/Etna_020625_1200_VIIRS375.csv'
-path_to_results = '/home/jennadia/MIROVA-DOWNFLOWGO/MIROVA_DOWNFLOWGO_tests/not_used_in_thesis/ventfinder_shapefile_tests'
-project_name = 'etna_test'
-epsg_code = 32633
-dem = '/home/jennadia/pyflowgo/DOWNFLOWGO_distribute/input_files/dem_2015_4m.tiff'
+
         
 
