@@ -481,7 +481,7 @@ def run_ventfinder(mirova_csv, dem, path_to_results, project_name, epsg_code, th
         rCTR values below this value will be elimnated from consideration.
     mask: Nonetype or str
         default=None. If not None, this is the path to a DEM with the extent of
-        the area the user wants excludeed from analysis
+        the area the user wants excludeed from analysis. Must be a geospatial raster
     shapefiles : bool
         default is False. If True, shapefiles are created for results (see
         documentation for function create_shapefiles)
