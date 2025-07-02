@@ -12,6 +12,9 @@ This is distributed with no guarantee that it can accurately predict teh eruptiv
 This code was written with python 3.11 and uses the packages NumPy, pandas, rasterio, fiona. The GUI was built using tkinter.
 
 References:
+
 Campus, A., Laiolo, M., Massimetti, F., & Coppola, D. (2022). The transition from MODIS to VIIRS for global volcano thermal monitoring. Sensors, 22(5), 1713.
+
 Coppola, D., Laiolo, M., Cigolini, C., Delle Donne, D., & Ripepe, M. (2016). Enhanced volcanic hot-spot detection using MODIS IR data: results from the MIROVA system.
+
 Coppola, D., Laiolo, M., Cigolini, C., Massimetti, F., Delle Donne, D., Ripepe, M., ... & William, R. (2020). Thermal remote sensing for global volcano monitoring: experiences from the MIROVA system. Frontiers in Earth Science, 7, 362.
