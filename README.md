@@ -7,11 +7,15 @@ The Ventfinder works by adding the middle infrared (MIR) and thermal infrared (T
 changed by the user. Then, it re-normalizes rCTR to the highest rCTR value in each cluster; this value is called rCTR'. Pixels with rCTR' less than the threshold are dropped from their clusters and no longer considered. Next, the average elevation is calculated for each remaining pixel (it is an average elevation because the DEM resolution is likely much finer that the MIROVA pixel resoluion). For each cluster, the pixel with the highest average elevation is 
 selected, and the selected pixels' center UTM coordiantes and average elevation are written to a .csv file. These selected pixels are presumed likliest to contain an effusive vent.
 
-This is distributed with no guarantee that it can accurately predict teh eruptive vent location.
+This is distributed with no guarantee that it can accurately predict the eruptive vent location.
 
 This code was written with python 3.11 and uses the packages NumPy, pandas, rasterio, fiona. The GUI was built using tkinter.
 
-References:
+# Testing the Ventfinder
+
+A sample DEM and MIROVA .csv file are provided. The DEM is *Galapagos Island, Ecuador 1 sec Digital Elevation Model*, created and distributed by the National Oceanic and Atmospheric Administration"s National Centers for Environmental Information (https://www.ncei.noaa.gov/access/metadata/landing-page/bin/iso?id=gov.noaa.ngdc.mgg.dem:11516). It has been clipped to inlcude only Fernandina Island and reprojected into the coordinate reference system EPSG 32715/UTM Zone 15S with a cell resolution of approximartely 30.8 meters. The MIROVA data was collected on 3 March 2024 at 07:30, which is several hours after the onset of the March-May 2024 eruption of Fernandina, and processed by the MIROVA algorithm. The data was compiled into a .csv file by the MIROVA team.
+
+# References:
 
 Campus, A., Laiolo, M., Massimetti, F., & Coppola, D. (2022). The transition from MODIS to VIIRS for global volcano thermal monitoring. Sensors, 22(5), 1713.
 
